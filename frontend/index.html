@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Player Impact Board</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: #0f172a;
+            color: white;
+            text-align: center;
+        }
+
+        h1 {
+            margin-top: 20px;
+        }
+
+        .team {
+            margin: 20px;
+        }
+
+        .player {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 5px auto;
+            width: 400px;
+        }
+
+        .bar-container {
+            width: 200px;
+            background: #1e293b;
+            height: 10px;
+            margin: 0 10px;
+        }
+
+        .bar {
+            height: 10px;
+            background: #22c55e;
+        }
+
+        .bar.red {
+            background: #ef4444;
+        }
+
+        #watch {
+            margin-top: 20px;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>⚽ Player Impact Board</h1>
+
+<div id="board"></div>
+
+<h2 id="watch"></h2>
+
+<script>
+async function fetchImpact() {
+    const res = await fetch("/match/1/impact");
+    const data = await res.json();
+
+    const board = document.getElementById("board");
+    board.innerHTML = "";
+
+    const spain = data.filter(p => p.team === "Spain");
+    const france = data.filter(p => p.team === "France");
+
+    function renderTeam(name, players, isRed=false) {
+        const div = document.createElement("div");
+        div.className = "team";
+
+        div.innerHTML = `<h2>${name}</h2>`;
+
+        players.forEach(p => {
+            const row = document.createElement("div");
+            row.className = "player";
+
+            const width = Math.min(p.impact_score * 5, 200);
+
+            row.innerHTML = `
+                <span>${p.name}</span>
+                <div class="bar-container">
+                    <div class="bar ${isRed ? 'red' : ''}" style="width:${width}px"></div>
+                </div>
+                <span>${p.impact_score}</span>
+            `;
+
+            div.appendChild(row);
+        });
+
+        board.appendChild(div);
+    }
+
+    renderTeam("Spain", spain);
+    renderTeam("France", france, true);
+}
+
+async function fetchWatch() {
+    const res = await fetch("/match/1/watch");
+    const data = await res.json();
+
+    document.getElementById("watch").innerText =
+        `👀 Watch: ${data.watch_player} (${data.impact_score})`;
+}
+
+// refresh every 3 seconds
+setInterval(() => {
+    fetchImpact();
+    fetchWatch();
+}, 3000);
+
+// initial load
+fetchImpact();
+fetchWatch();
+</script>
+
+</body>
+</html>

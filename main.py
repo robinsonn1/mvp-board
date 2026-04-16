@@ -1,132 +1,170 @@
-# =========================
-# Player Impact Engine - Starter Project
-# Backend: FastAPI + SQLite (easy to swap to MySQL)
-# =========================
-
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List
 import random
 import time
 from datetime import datetime
+import threading
 
 app = FastAPI()
 
 # -------------------------
-# In-memory storage (MVP)
+# SERVE FRONTEND
 # -------------------------
-players = [
-    {"id": 1, "name": "Pedri", "team": "Spain"},
-    {"id": 2, "name": "Morata", "team": "Spain"},
-    {"id": 3, "name": "Mbappe", "team": "France"},
-    {"id": 4, "name": "Griezmann", "team": "France"},
-]
+app.mount("/static", StaticFiles(directory="frontend", html=True), name="frontend")
 
-matches = {
-    1: {
-        "id": 1,
-        "home_team": "Spain",
-        "away_team": "France",
-        "minute": 1
-    }
-}
+# -------------------------
+# CREATE PLAYERS (22 TOTAL)
+# -------------------------
+players = []
 
+def create_players():
+    pid = 1
+    for team in ["Spain", "France"]:
+        for i in range(1, 12):
+            players.append({
+                "id": pid,
+                "name": f"{team[:2]} Player {i}",
+                "team": team,
+                "position": "GK" if i == 1 else "FW",
+                "is_captain": i == 2
+            })
+            pid += 1
+
+create_players()
+
+# -------------------------
+# DATA STORAGE
+# -------------------------
 events = []
 impact_cache = {}
+player_stats = {}
+
+# initialize stats
+for p in players:
+    player_stats[p["id"]] = {
+        "goals": 0,
+        "yellow": False,
+        "red": False
+    }
+
+EVENT_TYPES = ["pass", "shot", "goal", "yellow", "red"]
 
 # -------------------------
-# Event Generator (Simulator)
+# SIMULATOR
 # -------------------------
-EVENT_TYPES = ["pass", "shot", "goal", "foul"]
-
-
-def generate_event(match_id):
+def generate_event():
     player = random.choice(players)
+    event_type = random.choice(EVENT_TYPES)
 
     event = {
-        "match_id": match_id,
         "player_id": player["id"],
         "team": player["team"],
-        "event_type": random.choice(EVENT_TYPES),
+        "event_type": event_type,
         "outcome": random.choice(["success", "fail"]),
         "timestamp": datetime.utcnow()
     }
 
+    # update stats
+    if event_type == "goal":
+        player_stats[player["id"]]["goals"] += 1
+    elif event_type == "yellow":
+        player_stats[player["id"]]["yellow"] = True
+    elif event_type == "red":
+        player_stats[player["id"]]["red"] = True
+
     events.append(event)
-    return event
 
 # -------------------------
-# Impact Calculation
+# IMPACT ENGINE
 # -------------------------
-
 def calculate_impact(player_id):
     score = 0
-    recent_events = [e for e in events if e["player_id"] == player_id]
+    player_events = [e for e in events if e["player_id"] == player_id]
 
-    for e in recent_events:
+    for e in player_events:
         if e["event_type"] == "pass" and e["outcome"] == "success":
             score += 0.5
         elif e["event_type"] == "shot":
             score += 2
         elif e["event_type"] == "goal":
             score += 10
+        elif e["event_type"] == "yellow":
+            score -= 2
+        elif e["event_type"] == "red":
+            score -= 5
         elif e["event_type"] == "pass" and e["outcome"] == "fail":
             score -= 0.3
 
     return round(score, 2)
 
 # -------------------------
-# Background Simulation Loop
+# BACKGROUND LOOP
 # -------------------------
-
 def run_simulation():
     while True:
-        generate_event(1)
+        generate_event()
 
-        # update impact cache
         for p in players:
             impact_cache[p["id"]] = calculate_impact(p["id"])
 
-        time.sleep(3)
+        time.sleep(2)
 
 # -------------------------
-# API Schemas
+# RESPONSE MODEL
 # -------------------------
-
-class PlayerImpact(BaseModel):
+class PlayerResponse(BaseModel):
     player_id: int
     name: str
     team: str
     impact_score: float
+    icons: str
 
 # -------------------------
-# API Endpoints
+# ICON BUILDER
 # -------------------------
+def build_icons(player, stats):
+    icons = ""
 
-@app.get("/")
-def root():
-    return {"message": "Player Impact Engine running"}
+    if player["is_captain"]:
+        icons += "⭐ "
+    if player["position"] == "GK":
+        icons += "🧤 "
+    if stats["yellow"]:
+        icons += "🟨 "
+    if stats["red"]:
+        icons += "🟥 "
+    if stats["goals"] > 0:
+        icons += "⚽ "
 
+    return icons.strip()
 
-@app.get("/match/{match_id}/impact", response_model=List[PlayerImpact])
-def get_impact(match_id: int):
+# -------------------------
+# API ENDPOINTS
+# -------------------------
+@app.get("/match/1/impact", response_model=List[PlayerResponse])
+def get_impact():
     result = []
 
     for p in players:
+        stats = player_stats[p["id"]]
+
         result.append({
             "player_id": p["id"],
             "name": p["name"],
             "team": p["team"],
-            "impact_score": impact_cache.get(p["id"], 0)
+            "impact_score": impact_cache.get(p["id"], 0),
+            "icons": build_icons(p, stats)
         })
 
-    # sort descending
+    # 🔥 GLOBAL SORT (mixed teams)
     return sorted(result, key=lambda x: x["impact_score"], reverse=True)
 
 
-@app.get("/match/{match_id}/watch")
-def watch_player(match_id: int):
-    impacts = get_impact(match_id)
+@app.get("/match/1/watch")
+def watch_player():
+    impacts = get_impact()
 
     if not impacts:
         return {"message": "No data"}
@@ -136,21 +174,13 @@ def watch_player(match_id: int):
     return {
         "watch_player": top["name"],
         "impact_score": top["impact_score"],
-        "reason": "Highest impact score"
+        "reason": "Top impact player"
     }
 
 # -------------------------
-# Run simulator in background
+# START SIMULATION
 # -------------------------
-
-import threading
-
 @app.on_event("startup")
-def startup_event():
+def startup():
     thread = threading.Thread(target=run_simulation, daemon=True)
     thread.start()
-
-# -------------------------
-# To run:
-# uvicorn main:app --reload
-# -------------------------
