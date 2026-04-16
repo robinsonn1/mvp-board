@@ -1,134 +1,156 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Live Match Impact Board</title>
+    <title>World Cup Live Engine</title>
 
     <style>
         body {
             margin: 0;
             font-family: Arial, sans-serif;
-            background: #0b1220;
             color: white;
+            overflow: hidden;
         }
 
-        /* =========================
-           TOP HEADER (SCOREBOARD)
-        ========================= */
-        .header {
-            position: sticky;
+        /* ---------------- BACKGROUND ---------------- */
+        body::before {
+            content: "";
+            position: fixed;
             top: 0;
-            background: #0f172a;
-            padding: 12px 20px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("https://images.unsplash.com/photo-1508098682722-e99c43a406b2");
+            background-size: cover;
+            opacity: 0.15;
+            z-index: -1;
+        }
+
+        /* ---------------- TOP BAR ---------------- */
+        .topbar {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            padding: 12px 20px;
+            background: rgba(17, 24, 39, 0.9);
             border-bottom: 1px solid #1f2937;
+            backdrop-filter: blur(8px);
         }
 
-        .scoreboard {
-            font-size: 20px;
+        .live {
+            color: red;
+            font-weight: bold;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0.3; }
+        }
+
+        .score {
+            font-size: 22px;
             font-weight: bold;
         }
 
         .minute {
-            color: #94a3b8;
+            color: #9ca3af;
         }
 
-        .teams {
-            font-size: 14px;
-            color: #94a3b8;
-        }
-
-        /* =========================
-           CONTAINER
-        ========================= */
+        /* ---------------- CONTAINER ---------------- */
         .container {
-            padding: 20px;
-            max-width: 900px;
-            margin: auto;
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 10px;
+            padding: 15px;
         }
 
-        h1 {
-            text-align: center;
-            margin-bottom: 10px;
+        .panel {
+            background: rgba(17, 24, 39, 0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 10px;
+            height: 78vh;
+            overflow-y: auto;
         }
 
-        /* =========================
-           PLAYER ROW
-        ========================= */
+        /* ---------------- PLAYER ROW ---------------- */
         .player {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: #111827;
-            margin: 8px 0;
-            padding: 10px;
-            border-radius: 8px;
-            transition: all 0.3s ease;
+            padding: 8px;
+            margin-bottom: 6px;
+            border-radius: 6px;
+            transition: 0.3s;
         }
 
         .player:hover {
-            transform: scale(1.01);
-            background: #1f2937;
-        }
-
-        .rank {
-            width: 30px;
-            color: #94a3b8;
+            transform: scale(1.02);
         }
 
         .name {
-            width: 160px;
-            font-weight: bold;
-        }
-
-        .icons {
-            width: 120px;
-        }
-
-        .score {
-            width: 70px;
-            text-align: right;
-            color: #22c55e;
-        }
-
-        .momentum {
-            width: 60px;
-            text-align: right;
-            color: #fbbf24;
-        }
-
-        /* =========================
-           BAR
-        ========================= */
-        .bar-container {
-            flex: 1;
-            height: 8px;
-            background: #1f2937;
-            margin: 0 10px;
-            border-radius: 4px;
-            overflow: hidden;
+            width: 150px;
+            font-size: 12px;
         }
 
         .bar {
-            height: 100%;
-            transition: width 0.6s ease;
+            height: 6px;
+            border-radius: 4px;
         }
 
-        .spain { background: #22c55e; }
-        .france { background: #ef4444; }
-
-        /* =========================
-           MOMENTUM
-        ========================= */
-        .fire {
-            animation: pulse 1s infinite;
+        .scoreval {
+            font-size: 12px;
         }
 
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
+        /* ---------------- TEAM COLORS ---------------- */
+        .Spain { background: rgba(255, 0, 0, 0.15); }
+        .France { background: rgba(0, 80, 255, 0.15); }
+
+        /* ---------------- TOP 3 ---------------- */
+        .top3 {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .card {
+            flex: 1;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: gray;
+            margin: auto;
+            margin-bottom: 5px;
+        }
+
+        .pos {
+            font-size: 11px;
+            color: #9ca3af;
+        }
+
+        /* ---------------- FEED ---------------- */
+        .feed-item {
+            font-size: 12px;
+            padding: 6px;
+            border-bottom: 1px solid #1f2937;
+        }
+
+        /* ---------------- FOOTER ---------------- */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background: rgba(17, 24, 39, 0.95);
+            padding: 10px;
+            font-size: 11px;
+            color: #9ca3af;
+            display: flex;
+            justify-content: space-between;
         }
 
     </style>
@@ -136,92 +158,130 @@
 
 <body>
 
-<!-- =========================
-     HEADER (ONE SCOREBOARD ONLY)
-========================= -->
-<div class="header">
-    <div class="scoreboard" id="scoreboard">
-        Spain 0 - 0 France
-    </div>
-
-    <div class="minute" id="minute">
-        0'
-    </div>
+<!-- TOP BAR -->
+<div class="topbar">
+    <div class="live">🔴 LIVE</div>
+    <div class="score" id="score">0 - 0</div>
+    <div class="minute" id="minute">0'</div>
 </div>
 
+<!-- MAIN -->
 <div class="container">
-    <h1>⚽ Live Player Impact Board</h1>
 
-    <div id="board"></div>
+    <!-- LEFT FEED -->
+    <div class="panel">
+        <h3>Match Feed</h3>
+        <div id="feed"></div>
+    </div>
+
+    <!-- CENTER -->
+    <div class="panel">
+        <h3>Top Players</h3>
+        <div id="top3" class="top3"></div>
+
+        <h3>Player Impact</h3>
+        <div id="players"></div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="panel">
+        <h3>Match Stats</h3>
+        <div class="feed-item">Possession 50/50</div>
+        <div class="feed-item">Shots: <span id="shots">0</span></div>
+        <div class="feed-item">Goals: <span id="goals">0</span></div>
+        <div class="feed-item">Fouls: <span id="fouls">0</span></div>
+    </div>
+
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+    <div>
+        ⭐ Captain | 🧤 Goalkeeper | 🔥 Hot form (impact > 15)
+    </div>
+    <div>
+        FIFA 2026 Simulation Engine • FastAPI + Python
+    </div>
 </div>
 
 <script>
 
-async function fetchStatus() {
+async function updateStatus() {
     const res = await fetch("/match/1/status");
     const data = await res.json();
 
-    document.getElementById("scoreboard").innerText =
-        `${data.home} ${data.score} ${data.away}`;
-
-    document.getElementById("minute").innerText =
-        `${data.minute}'`;
+    document.getElementById("score").innerText = data.score;
+    document.getElementById("minute").innerText = data.minute + "'";
 }
 
-async function fetchImpact() {
+async function updateFeed() {
+    const res = await fetch("/match/1/feed");
+    const data = await res.json();
+
+    const feed = document.getElementById("feed");
+    feed.innerHTML = "";
+
+    data.forEach(ev => {
+        const div = document.createElement("div");
+        div.className = "feed-item";
+        div.innerText = `${ev.minute}' ${ev.text}`;
+        feed.appendChild(div);
+    });
+}
+
+async function updateImpact() {
     const res = await fetch("/match/1/impact");
-    let data = await res.json();
+    const data = await res.json();
 
-    const board = document.getElementById("board");
-    board.innerHTML = "";
+    const container = document.getElementById("players");
+    const top3 = document.getElementById("top3");
 
-    // normalize max score for bars
+    container.innerHTML = "";
+    top3.innerHTML = "";
+
     const max = Math.max(...data.map(p => p.impact_score)) || 1;
+
+    let goals = 0, shots = 0, fouls = 0;
 
     data.forEach((p, index) => {
 
         const width = (p.impact_score / max) * 100;
 
-        const row = document.createElement("div");
-        row.className = "player";
+        const div = document.createElement("div");
+        div.className = `player ${p.team}`;
 
-        const barClass = p.team === "Spain" ? "spain" : "france";
-
-        const fire = p.momentum > 5 ? "fire" : "";
-
-        row.innerHTML = `
-            <div class="rank">${index + 1}</div>
-
-            <div class="name">
-                ${p.name}
+        div.innerHTML = `
+            <div class="name">${p.icons || ""} ${p.name}</div>
+            <div style="flex:1; margin:0 10px;">
+                <div class="bar" style="width:${width}%; background:${p.team === "Spain" ? "red" : "blue"}"></div>
             </div>
-
-            <div class="icons">
-                ${p.icons || ""}
-                ${p.momentum > 5 ? "🔥" : ""}
-            </div>
-
-            <div class="bar-container">
-                <div class="bar ${barClass} ${fire}" style="width:${width}%"></div>
-            </div>
-
-            <div class="score">${p.impact_score}</div>
-
-            <div class="momentum">${p.momentum}</div>
+            <div class="scoreval">${p.impact_score}</div>
         `;
 
-        board.appendChild(row);
+        container.appendChild(div);
+
+        if (index < 3) {
+            const card = document.createElement("div");
+            card.className = "card";
+            card.innerHTML = `
+                <div class="avatar"></div>
+                <div>${p.name}</div>
+                <div class="pos">${p.position}</div>
+                <div>🔥 ${p.impact_score}</div>
+            `;
+            top3.appendChild(card);
+        }
     });
 }
 
-async function refresh() {
-    fetchStatus();
-    fetchImpact();
+async function loop() {
+    updateStatus();
+    updateImpact();
+    updateFeed();
 }
 
-setInterval(refresh, 2000);
-
-refresh();
+setInterval(loop, 2000);
+loop();
 
 </script>
 

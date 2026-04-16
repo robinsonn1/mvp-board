@@ -6,91 +6,121 @@ import threading
 import time
 
 app = FastAPI()
-
 app.mount("/static", StaticFiles(directory="frontend", html=True), name="frontend")
 
 # -------------------------
-# LOAD TEAMS
+# LOAD PLAYERS
 # -------------------------
-def load_teams():
-    with open("data/teams.json", "r") as f:
+def load_players():
+    with open("data/players.json", "r") as f:
         return json.load(f)
 
-teams_list = load_teams()
+all_players = load_players()
 
 # -------------------------
-# GENERATE PLAYERS (REALISTIC WORLD CUP STYLE)
+# MATCH SELECTION
 # -------------------------
-positions = ["GK", "DF", "DF", "DF", "DF", "MF", "MF", "MF", "FW", "FW", "FW"]
+def generate_match():
+    teams = list(set([p["team"] for p in all_players]))
+    home, away = random.sample(teams, 2)
 
-players = []
-pid = 1
+    match_players = [p for p in all_players if p["team"] in [home, away]]
+    return home, away, match_players
 
-for team in teams_list:
-    for i in range(11):  # starting XI
-        players.append({
-            "id": pid,
-            "name": f"{team['name']} Player {i+1}",
-            "team": team["name"],
-            "position": positions[i],
-            "is_captain": i == 1  # simple captain rule
-        })
-        pid += 1
+HOME_TEAM, AWAY_TEAM, players = generate_match()
 
 # -------------------------
 # MATCH STATE
 # -------------------------
 MATCH_MINUTE = 0
+HALF = 1
 
-team_score = {t["name"]: 0 for t in teams_list}
+score = {
+    HOME_TEAM: 0,
+    AWAY_TEAM: 0
+}
 
 impact = {p["id"]: 0 for p in players}
 momentum = {p["id"]: 0 for p in players}
 
-EVENTS = ["pass", "shot", "goal", "yellow", "red"]
+# -------------------------
+# MATCH FEED (NEW 🔥)
+# -------------------------
+events_feed = []
+
+def log_event(player, event_type):
+    events_feed.insert(0, {
+        "minute": MATCH_MINUTE,
+        "text": f"{event_type.upper()} - {player['name']} ({player['team']})"
+    })
+
+    if len(events_feed) > 30:
+        events_feed.pop()
 
 # -------------------------
-# SIMULATION
+# EVENT SYSTEM
+# -------------------------
+EVENT_DISTRIBUTION = {
+    "pass": 0.70,
+    "shot": 0.18,
+    "goal": 0.03,
+    "foul": 0.06,
+    "miss": 0.03
+}
+
+def pick_event():
+    return random.choices(
+        list(EVENT_DISTRIBUTION.keys()),
+        list(EVENT_DISTRIBUTION.values()),
+        k=1
+    )[0]
+
+# -------------------------
+# SIMULATION ENGINE
 # -------------------------
 def simulate():
-    while True:
-        p = random.choice(players)
-        pid = p["id"]
-        team = p["team"]
+    global MATCH_MINUTE, HALF
 
-        event = random.choice(EVENTS)
+    while MATCH_MINUTE < 90:
+
+        player = random.choice(players)
+        pid = player["id"]
+        team = player["team"]
+
+        event = pick_event()
 
         if event == "goal":
-            team_score[team] += 1
+            score[team] += 1
             impact[pid] += 10
             momentum[pid] += 5
+            log_event(player, "goal")
 
         elif event == "shot":
             impact[pid] += 2
-            momentum[pid] += 1.2
+            momentum[pid] += 1
+            log_event(player, "shot")
 
         elif event == "pass":
-            impact[pid] += 0.4
+            impact[pid] += 0.3
 
-        elif event == "yellow":
-            impact[pid] -= 2
+        elif event == "foul":
+            impact[pid] -= 1
+            log_event(player, "foul")
 
-        elif event == "red":
-            impact[pid] -= 5
+        elif event == "miss":
+            impact[pid] -= 0.5
+            log_event(player, "miss")
 
-        time.sleep(1.5)
+        # halftime logic
+        if MATCH_MINUTE == 45:
+            time.sleep(3)
+            HALF = 2
 
-# -------------------------
-# TIMER
-# -------------------------
-def timer():
-    global MATCH_MINUTE
-    while True:
-        time.sleep(5)
         MATCH_MINUTE += 1
+        time.sleep(0.5)
 
 # -------------------------
-# ICONS
+# ICONS SYSTEM
 # -------------------------
 def icons(p):
     i = ""
@@ -98,23 +128,27 @@ def icons(p):
         i += "⭐ "
     if p["position"] == "GK":
         i += "🧤 "
-    if impact[p["id"]] > 20:
+    if impact[p["id"]] > 15:
         i += "🔥 "
     return i.strip()
 
 # -------------------------
-# API
+# API: STATUS
 # -------------------------
 @app.get("/match/1/status")
 def status():
-    teams = list(team_score.keys())
     return {
-        "home": teams[0],
-        "away": teams[1],
-        "score": f"{team_score[teams[0]]} - {team_score[teams[1]]}",
-        "minute": MATCH_MINUTE
+        "home": HOME_TEAM,
+        "away": AWAY_TEAM,
+        "score": f"{score[HOME_TEAM]} - {score[AWAY_TEAM]}",
+        "minute": MATCH_MINUTE,
+        "half": HALF,
+        "status": "LIVE" if MATCH_MINUTE < 90 else "FULL TIME"
     }
 
+# -------------------------
+# API: IMPACT BOARD
+# -------------------------
 @app.get("/match/1/impact")
 def impact_board():
     result = []
@@ -133,9 +167,37 @@ def impact_board():
     return sorted(result, key=lambda x: x["impact_score"], reverse=True)
 
 # -------------------------
-# START
+# API: MATCH FEED (NEW 🔥)
+# -------------------------
+@app.get("/match/1/feed")
+def feed():
+    return events_feed
+
+# -------------------------
+# API: ENGINE INFO (for UI "about section")
+# -------------------------
+@app.get("/match/1/info")
+def info():
+    return {
+        "engine": "FIFA 2026 Simulation Engine",
+        "version": "1.0",
+        "rules": {
+            "pass": "+0.3 impact",
+            "shot": "+2 impact",
+            "goal": "+10 impact",
+            "foul": "-1 impact",
+            "miss": "-0.5 impact"
+        },
+        "emojis": {
+            "⭐": "Captain",
+            "🧤": "Goalkeeper",
+            "🔥": "Hot form (impact > 15)"
+        }
+    }
+
+# -------------------------
+# STARTUP
 # -------------------------
 @app.on_event("startup")
 def start():
     threading.Thread(target=simulate, daemon=True).start()
-    threading.Thread(target=timer, daemon=True).start()
