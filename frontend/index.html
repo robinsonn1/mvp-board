@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>World Cup Live Engine</title>
+    <title>World Cup Live Engine V2</title>
 
     <style>
         body {
@@ -11,28 +11,23 @@
             overflow: hidden;
         }
 
-        /* ---------------- BACKGROUND ---------------- */
         body::before {
             content: "";
             position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            inset: 0;
             background: url("https://images.unsplash.com/photo-1508098682722-e99c43a406b2");
             background-size: cover;
-            opacity: 0.15;
+            opacity: 0.12;
             z-index: -1;
         }
 
-        /* ---------------- TOP BAR ---------------- */
+        /* TOP BAR */
         .topbar {
             display: flex;
             justify-content: space-between;
             padding: 12px 20px;
-            background: rgba(17, 24, 39, 0.9);
+            background: rgba(17, 24, 39, 0.95);
             border-bottom: 1px solid #1f2937;
-            backdrop-filter: blur(8px);
         }
 
         .live {
@@ -54,7 +49,14 @@
             color: #9ca3af;
         }
 
-        /* ---------------- CONTAINER ---------------- */
+        /* MATCH INFO */
+        .matchinfo {
+            text-align: center;
+            font-size: 13px;
+            color: #9ca3af;
+        }
+
+        /* LAYOUT */
         .container {
             display: grid;
             grid-template-columns: 1fr 2fr 1fr;
@@ -64,47 +66,44 @@
 
         .panel {
             background: rgba(17, 24, 39, 0.85);
-            backdrop-filter: blur(10px);
             border-radius: 12px;
             padding: 10px;
-            height: 78vh;
+            height: 85vh;
             overflow-y: auto;
         }
 
-        /* ---------------- PLAYER ROW ---------------- */
+        /* PLAYER ROW */
         .player {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 8px;
-            margin-bottom: 6px;
+            padding: 6px;
             border-radius: 6px;
-            transition: 0.3s;
-        }
-
-        .player:hover {
-            transform: scale(1.02);
-        }
-
-        .name {
-            width: 150px;
-            font-size: 12px;
+            margin-bottom: 6px;
         }
 
         .bar {
             height: 6px;
-            border-radius: 4px;
+            border-radius: 5px;
+            background: linear-gradient(90deg, #22c55e, #16a34a);
+        }
+
+        .name {
+            width: 220px;
+            font-size: 12px;
         }
 
         .scoreval {
             font-size: 12px;
+            width: 40px;
+            text-align: right;
         }
 
-        /* ---------------- TEAM COLORS ---------------- */
-        .Spain { background: rgba(255, 0, 0, 0.15); }
-        .France { background: rgba(0, 80, 255, 0.15); }
+        /* TEAM COLORS */
+        .Spain { background: rgba(255, 0, 0, 0.12); }
+        .France { background: rgba(0, 90, 255, 0.12); }
 
-        /* ---------------- TOP 3 ---------------- */
+        /* TOP 3 */
         .top3 {
             display: flex;
             gap: 10px;
@@ -114,43 +113,36 @@
         .card {
             flex: 1;
             background: rgba(255,255,255,0.05);
-            border-radius: 10px;
             padding: 10px;
+            border-radius: 10px;
             text-align: center;
         }
 
         .avatar {
-            width: 45px;
-            height: 45px;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
-            background: gray;
+            background: #374151;
             margin: auto;
-            margin-bottom: 5px;
         }
 
-        .pos {
-            font-size: 11px;
-            color: #9ca3af;
-        }
-
-        /* ---------------- FEED ---------------- */
+        /* FEED */
         .feed-item {
             font-size: 12px;
             padding: 6px;
             border-bottom: 1px solid #1f2937;
         }
 
-        /* ---------------- FOOTER ---------------- */
-        .footer {
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-            background: rgba(17, 24, 39, 0.95);
-            padding: 10px;
+        /* SECTION TITLE */
+        h3 {
+            margin-top: 5px;
+            font-size: 14px;
+            color: #d1d5db;
+        }
+
+        .coach {
             font-size: 11px;
             color: #9ca3af;
-            display: flex;
-            justify-content: space-between;
         }
 
     </style>
@@ -161,14 +153,19 @@
 <!-- TOP BAR -->
 <div class="topbar">
     <div class="live">🔴 LIVE</div>
-    <div class="score" id="score">0 - 0</div>
+
+    <div>
+        <div class="score" id="score">0 - 0</div>
+        <div class="matchinfo" id="teams">Loading...</div>
+    </div>
+
     <div class="minute" id="minute">0'</div>
 </div>
 
 <!-- MAIN -->
 <div class="container">
 
-    <!-- LEFT FEED -->
+    <!-- FEED -->
     <div class="panel">
         <h3>Match Feed</h3>
         <div id="feed"></div>
@@ -176,32 +173,149 @@
 
     <!-- CENTER -->
     <div class="panel">
-        <h3>Top Players</h3>
+
+        <h3>Top 3 Players</h3>
         <div id="top3" class="top3"></div>
 
-        <h3>Player Impact</h3>
+        <h3>Player Ranking (22)</h3>
         <div id="players"></div>
+
     </div>
 
     <!-- RIGHT -->
     <div class="panel">
         <h3>Match Stats</h3>
-        <div class="feed-item">Possession 50/50</div>
-        <div class="feed-item">Shots: <span id="shots">0</span></div>
-        <div class="feed-item">Goals: <span id="goals">0</span></div>
-        <div class="feed-item">Fouls: <span id="fouls">0</span></div>
+
+        <div class="feed-item">⚽ Goals: <span id="goals">0</span></div>
+        <div class="feed-item">🎯 Shots: <span id="shots">0</span></div>
+        <div class="feed-item">🚩 Fouls: <span id="fouls">0</span></div>
+
+        <br>
+
+        <h3>Engine Info</h3>
+        <div class="feed-item">AI Impact Engine v1</div>
+        <div class="feed-item">Pass +0.3</div>
+        <div class="feed-item">Shot +2</div>
+        <div class="feed-item">Goal +10</div>
+        <div class="feed-item">Foul -1</div>
+
+        <br>
+
+        <h3>Emoji Guide</h3>
+        <div class="feed-item">⭐ Captain</div>
+        <div class="feed-item">🧤 Goalkeeper</div>
+        <div class="feed-item">🔥 Hot form</div>
+        <div class="feed-item">📈 Rising</div>
+        <div class="feed-item">📉 Falling</div>
     </div>
 
 </div>
 
-<!-- FOOTER -->
-<div class="footer">
-    <div>
-        ⭐ Captain | 🧤 Goalkeeper | 🔥 Hot form (impact > 15)
-    </div>
-    <div>
-        FIFA 2026 Simulation Engine • FastAPI + Python
-    </div>
-</div>
+<script>
+
+async function updateStatus() {
+    const res = await fetch("/match/1/status");
+    const data = await res.json();
+
+    document.getElementById("score").innerText = data.score;
+    document.getElementById("minute").innerText = data.minute + "'";
+
+    document.getElementById("teams").innerText =
+        `${data.home} vs ${data.away}`;
+}
+
+async function updateImpact() {
+    const res = await fetch("/match/1/impact");
+    const data = await res.json();
+
+    const players = data.players;
+
+    const container = document.getElementById("players");
+    const top3 = document.getElementById("top3");
+
+    container.innerHTML = "";
+    top3.innerHTML = "";
+
+    const max = Math.max(...players.map(p => p.impact_score)) || 1;
+
+    players.forEach((p, i) => {
+
+        const width = (p.impact_score / max) * 100;
+
+        const div = document.createElement("div");
+        div.className = `player ${p.team}`;
+
+        div.innerHTML = `
+            <div class="name">
+                ${i + 1}. #${p.number} ${p.flag} ${p.name} ${p.icons || ""}
+            </div>
+
+            <div style="flex:1; margin:0 10px;">
+                <div class="bar" style="width:${width}%"></div>
+            </div>
+
+            <div class="scoreval">${p.impact_score.toFixed(1)}</div>
+        `;
+
+        container.appendChild(div);
+
+        if (i < 3) {
+            const card = document.createElement("div");
+            card.className = "card";
+
+            card.innerHTML = `
+                <div class="avatar"></div>
+                <div>${p.name}</div>
+                <div>${p.position}</div>
+                <div>🔥 ${p.impact_score.toFixed(1)}</div>
+            `;
+
+            top3.appendChild(card);
+        }
+    });
+}
+
+async function updateFeed() {
+    const res = await fetch("/match/1/feed");
+    const data = await res.json();
+
+    const feed = document.getElementById("feed");
+    feed.innerHTML = "";
+
+    data.forEach(e => {
+        const div = document.createElement("div");
+        div.className = "feed-item";
+        div.innerText = `${e.minute}' - ${e.event.toUpperCase()} - ${e.player} (${e.team})`;
+        feed.appendChild(div);
+    });
+}
+
+async function updateStats() {
+    const res = await fetch("/match/1/stats");
+    const data = await res.json();
+
+    document.getElementById("goals").innerText = data.goals;
+    document.getElementById("shots").innerText = data.shots;
+    document.getElementById("fouls").innerText = data.fouls;
+}
+
+function loop() {
+    updateStatus();
+    updateImpact();
+    updateFeed();
+    updateStats();
+}
+
+setInterval(loop, 2000);
+loop();
+
+const ws = new WebSocket("ws://127.0.0.1:8000/ws");
+
+ws.onmessage = () => {
+    loop();
+};
+
+</script>
+
 </body>
 </html>

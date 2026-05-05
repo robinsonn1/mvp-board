@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WhatsApp Match Preview</title>
+
+    <style>
+        body {
+            background: #0b141a;
+            font-family: Arial;
+            color: white;
+            padding: 20px;
+        }
+
+        .phone {
+            width: 360px;
+            margin: auto;
+            background: #111b21;
+            border-radius: 20px;
+            padding: 15px;
+        }
+
+        .header {
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .message {
+            background: #202c33;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            white-space: pre-line;
+        }
+
+        .small {
+            font-size: 12px;
+            color: #8696a0;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="phone">
+
+    <div class="header">📱 WhatsApp Match Feed</div>
+
+    <div class="small">Auto-generated message preview</div>
+
+    <div id="msg" class="message">Loading...</div>
+
+</div>
+
+<script>
+
+async function buildMessage() {
+
+    const status = await fetch("/match/1/status").then(r => r.json());
+    const impactRes = await fetch("/match/1/impact").then(r => r.json());
+    const feed = await fetch("/match/1/feed").then(r => r.json());
+    const stats = await fetch("/match/1/stats").then(r => r.json());
+
+    const players = impactRes.players;
+
+    let top = players[0];
+
+    let ranking = players.map((p, i) => {
+        return `${i+1}. ${p.icons || ""} ${p.name} (${p.team}) - ${p.impact_score}`;
+    }).join("\n");
+
+    let message = `
+🏟️ ${status.home} vs ${status.away}
+⏱️ ${status.minute}'
+🔥 Score: ${status.score}
+
+⭐ Top Player: ${top.name} (${top.impact_score})
+
+📊 Latest Event:
+${feed[0] ? feed[0].event.toUpperCase() + " - " + feed[0].player : "No events"}
+
+📈 Match Stats:
+⚽ Goals: ${stats.goals}
+🎯 Shots: ${stats.shots}
+🚫 Fouls: ${stats.fouls}
+
+👥 Player Ranking (22):
+${ranking}
+
+🧠 Insight:
+${generateInsight(stats)}
+`;
+
+    document.getElementById("msg").innerText = message;
+}
+
+function generateInsight(stats) {
+    if (stats.goals >= 3) return "Goal fest 🔥 attacking chaos";
+    if (stats.shots > 12) return "High offensive pressure ⚡";
+    if (stats.fouls > 10) return "Physical match 💥";
+    return "Balanced tactical game ⚖️";
+}
+
+setInterval(buildMessage, 3000);
+buildMessage();
+
+</script>
+
+</body>
+</html>

@@ -4,11 +4,14 @@ async function updateStatus() {
 
     document.getElementById("score").innerText = data.score;
     document.getElementById("minute").innerText = data.minute + "'";
+    document.getElementById("teams").innerText = `${data.home} vs ${data.away}`;
 }
 
 async function updateImpact() {
     const res = await fetch("/match/1/impact");
     const data = await res.json();
+
+    const players = data.players || [];
 
     const container = document.getElementById("players");
     const top3 = document.getElementById("top3");
@@ -16,33 +19,40 @@ async function updateImpact() {
     container.innerHTML = "";
     top3.innerHTML = "";
 
-    const max = Math.max(...data.map(p => p.impact_score)) || 1;
+    const max = Math.max(...players.map(p => p.impact_score)) || 1;
 
-    data.forEach((p, index) => {
+    players.forEach((p, i) => {
+
         const width = (p.impact_score / max) * 100;
 
         const div = document.createElement("div");
         div.className = `player ${p.team}`;
 
         div.innerHTML = `
-            <div class="name">${p.icons || ""} ${p.name}</div>
-            <div style="flex:1; margin:0 10px;">
-                <div class="bar" style="width:${width}%; background:${p.team === "Spain" ? "red" : "blue"}"></div>
+            <div class="name">
+                ${i+1}. #${p.number} ${p.flag} ${p.name} ${p.icons || ""}
             </div>
-            <div class="scoreval">${p.impact_score}</div>
+
+            <div style="flex:1; margin:0 10px;">
+                <div class="bar" style="width:${width}%"></div>
+            </div>
+
+            <div class="scoreval">${p.impact_score.toFixed(1)}</div>
         `;
 
         container.appendChild(div);
 
-        if (index < 3) {
+        if (i < 3) {
             const card = document.createElement("div");
             card.className = "card";
+
             card.innerHTML = `
                 <div class="avatar"></div>
                 <div>${p.name}</div>
-                <div class="pos">${p.position}</div>
-                <div>🔥 ${p.impact_score}</div>
+                <div>${p.position}</div>
+                <div>🔥 ${p.impact_score.toFixed(1)}</div>
             `;
+
             top3.appendChild(card);
         }
     });
@@ -58,7 +68,7 @@ async function updateFeed() {
     data.forEach(e => {
         const div = document.createElement("div");
         div.className = "feed-item";
-        div.innerText = `${e.minute}' - ${e.event.toUpperCase()} - ${e.player} (${e.team})`;
+        div.innerText = `${e.minute}' - ${e.event.toUpperCase()} - ${e.player}`;
         feed.appendChild(div);
     });
 }
@@ -67,8 +77,8 @@ async function updateStats() {
     const res = await fetch("/match/1/stats");
     const data = await res.json();
 
-    document.getElementById("shots").innerText = data.shots;
     document.getElementById("goals").innerText = data.goals;
+    document.getElementById("shots").innerText = data.shots;
     document.getElementById("fouls").innerText = data.fouls;
 }
 
@@ -84,14 +94,6 @@ loop();
 
 const ws = new WebSocket("ws://127.0.0.1:8000/ws");
 
-ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-
-    console.log("LIVE UPDATE:", data);
-
-    // optional: instant UI update trigger
-    updateStatus();
-    updateImpact();
-    updateFeed();
-    updateStats();
+ws.onmessage = () => {
+    loop();
 };
