@@ -1,9 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 import json
 import random
 import threading
 import time
+import asyncio
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="frontend", html=True), name="frontend")
@@ -23,7 +24,6 @@ all_players = load_players()
 def generate_match():
     teams = list(set([p["team"] for p in all_players]))
     home, away = random.sample(teams, 2)
-
     match_players = [p for p in all_players if p["team"] in [home, away]]
     return home, away, match_players
 
@@ -35,24 +35,39 @@ HOME_TEAM, AWAY_TEAM, players = generate_match()
 MATCH_MINUTE = 0
 HALF = 1
 
-score = {
-    HOME_TEAM: 0,
-    AWAY_TEAM: 0
-}
-
+score = {HOME_TEAM: 0, AWAY_TEAM: 0}
 impact = {p["id"]: 0 for p in players}
 momentum = {p["id"]: 0 for p in players}
 
+# NEW: stats
+stats = {
+    "shots": 0,
+    "fouls": 0,
+    "goals": 0
+}
+
 # -------------------------
-# MATCH FEED (NEW 🔥)
+# MATCH FEED
 # -------------------------
 events_feed = []
 
 def log_event(player, event_type):
+    global stats
+
     events_feed.insert(0, {
         "minute": MATCH_MINUTE,
-        "text": f"{event_type.upper()} - {player['name']} ({player['team']})"
+        "event": event_type,
+        "player": player["name"],
+        "team": player["team"]
     })
+
+    # stats update
+    if event_type == "goal":
+        stats["goals"] += 1
+    elif event_type == "shot":
+        stats["shots"] += 1
+    elif event_type == "foul":
+        stats["fouls"] += 1
 
     if len(events_feed) > 30:
         events_feed.pop()
@@ -76,10 +91,33 @@ def pick_event():
     )[0]
 
 # -------------------------
+# WEBSOCKET MANAGER 🔥
+# -------------------------
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, data):
+        for connection in self.active_connections:
+            await connection.send_json(data)
+
+manager = ConnectionManager()
+
+# -------------------------
 # SIMULATION ENGINE
 # -------------------------
 def simulate():
     global MATCH_MINUTE, HALF
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
     while MATCH_MINUTE < 90:
 
@@ -111,7 +149,17 @@ def simulate():
             impact[pid] -= 0.5
             log_event(player, "miss")
 
-        # halftime logic
+        # broadcast update 🔥
+        data = {
+            "minute": MATCH_MINUTE,
+            "score": score,
+            "event": event,
+            "feed": events_feed[:5]
+        }
+
+        loop.run_until_complete(manager.broadcast(data))
+
+        # halftime
         if MATCH_MINUTE == 45:
             time.sleep(3)
             HALF = 2
@@ -120,13 +168,13 @@ def simulate():
         time.sleep(0.5)
 
 # -------------------------
-# ICONS SYSTEM
+# ICONS
 # -------------------------
 def icons(p):
     i = ""
-    if p["is_captain"]:
+    if p.get("is_captain"):
         i += "⭐ "
-    if p["position"] == "GK":
+    if p.get("position") == "GK":
         i += "🧤 "
     if impact[p["id"]] > 15:
         i += "🔥 "
@@ -147,7 +195,7 @@ def status():
     }
 
 # -------------------------
-# API: IMPACT BOARD
+# API: IMPACT
 # -------------------------
 @app.get("/match/1/impact")
 def impact_board():
@@ -158,7 +206,7 @@ def impact_board():
             "player_id": p["id"],
             "name": p["name"],
             "team": p["team"],
-            "position": p["position"],
+            "position": p.get("position"),
             "impact_score": round(impact[p["id"]], 2),
             "momentum": round(momentum[p["id"]], 2),
             "icons": icons(p)
@@ -167,33 +215,44 @@ def impact_board():
     return sorted(result, key=lambda x: x["impact_score"], reverse=True)
 
 # -------------------------
-# API: MATCH FEED (NEW 🔥)
+# API: FEED
 # -------------------------
 @app.get("/match/1/feed")
 def feed():
     return events_feed
 
 # -------------------------
-# API: ENGINE INFO (for UI "about section")
+# API: STATS (NEW 🔥)
 # -------------------------
-@app.get("/match/1/info")
-def info():
+@app.get("/match/1/stats")
+def get_stats():
+    return stats
+
+# -------------------------
+# API: EXPLAIN PLAYER 🔥
+# -------------------------
+@app.get("/player/{player_id}/explain")
+def explain(player_id: int):
     return {
-        "engine": "FIFA 2026 Simulation Engine",
-        "version": "1.0",
-        "rules": {
-            "pass": "+0.3 impact",
-            "shot": "+2 impact",
-            "goal": "+10 impact",
-            "foul": "-1 impact",
-            "miss": "-0.5 impact"
-        },
-        "emojis": {
-            "⭐": "Captain",
-            "🧤": "Goalkeeper",
-            "🔥": "Hot form (impact > 15)"
+        "player_id": player_id,
+        "impact": impact[player_id],
+        "breakdown": {
+            "goals": impact[player_id] // 10,
+            "shots": impact[player_id] // 2
         }
     }
+
+# -------------------------
+# WEBSOCKET ENDPOINT 🔥
+# -------------------------
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 
 # -------------------------
 # STARTUP
